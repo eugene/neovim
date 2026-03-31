@@ -685,6 +685,7 @@ static void handle_unknown_csi(TermInput *input, const TermKeyKey *key)
   uint8_t intermediate = (cmd >> 16) & 0xFF;
   uint8_t initial = (cmd >> 8) & 0xFF;
   uint8_t command = cmd & 0xFF;
+  bool inband_resize = false;
 
   // Currently unused
   (void)intermediate;
@@ -706,8 +707,7 @@ static void handle_unknown_csi(TermInput *input, const TermKeyKey *key)
       break;
     }
     break;
-  case 't':
-    bool inband_resize = false;
+  case 't':  
     if (nparams == 5) {
       // We only care about the first 3 parameters, and we ignore subparameters
       int args[3];

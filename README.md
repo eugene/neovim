@@ -20,6 +20,12 @@ Neovim is a project that seeks to aggressively refactor [Vim](https://www.vim.or
 See the [Introduction](https://github.com/neovim/neovim/wiki/Introduction) wiki page and [Roadmap]
 for more information.
 
+This fork
+--------
+Enables kitty terminal's [Kitty Graphics Protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/) in Neovim's built-in terminal emulator (`:terminal`):
+
+<img src="runtime/screenshot.png" alt="Neovim terminal with Kitty Graphics Protocol enabled" width="600">
+
 Features
 --------
 
