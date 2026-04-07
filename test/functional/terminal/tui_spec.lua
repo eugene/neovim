@@ -224,7 +224,7 @@ describe('TUI :restart', function()
       '--cmd',
       'colorscheme vim',
       '--cmd',
-      'set laststatus=2 background=dark noruler',
+      'set laststatus=2 background=dark noruler noshowcmd',
       -- XXX: New server starts before the UI connects to it.
       -- So checking screen state for this pid is not possible.
       -- '--cmd',
@@ -315,8 +315,15 @@ describe('TUI :restart', function()
     assert_termguicolors_and_no_gui_running()
 
     -- Check ":restart +echo" cannot restart server.
+    -- Check the full screen state to ensure this doesn't pollute the current UI.
     tt.feed_data(':restart +echo\013')
-    screen:expect({ any = vim.pesc('+cmd did not quit the server') })
+    screen:expect([[
+      ^                                                  |
+      {1:~}{18:                                                 }|*3
+      {3:[No Name]                                         }|
+      {9:restart failed: +cmd did not quit the server}      |
+      {5:-- TERMINAL --}                                    |
+    ]])
 
     tt.feed_data('ithis will be removed\027')
     screen:expect({ any = vim.pesc('this will be remove^d') })
@@ -514,7 +521,7 @@ describe('TUI :restart', function()
       '-u',
       config_file,
       '--cmd',
-      'set notermguicolors noswapfile laststatus=0 nowrap noruler',
+      'set notermguicolors noswapfile laststatus=0 nowrap noruler noshowcmd',
     }, { env = env_notermguicolors })
     screen:expect([[
       ^                                                  |
@@ -2922,6 +2929,18 @@ describe('TUI', function()
       { 'tty', 'tty' },
       child_exec_lua('return { vim.uv.guess_handle(0), vim.uv.guess_handle(1) }')
     )
+    -- Also works after :restart #38745
+    feed_data(':restart lua ={ vim.uv.guess_handle(0), vim.uv.guess_handle(1) }\r')
+    screen:expect([[
+      ^                                                  |
+      {100:~                                                 }|*3
+      {3:[No Name]                                         }|
+      { "tty", "tty" }                                  |
+      {5:-- TERMINAL --}                                    |
+    ]])
+    -- The server is now detached and needs to be quit explicitly.
+    feed_data(':qall!\r')
+    screen:expect({ any = vim.pesc('[Process exited 0]') })
   end)
 end)
 
@@ -4279,22 +4298,36 @@ describe('TUI client', function()
   it(':restart works when connecting to remote instance (with its own TUI)', function()
     local _, screen_server, screen_client = start_tui_and_remote_client()
 
-    -- The remote client should attach to the new server.
+    -- Both clients should attach to the new server.
     feed_data(':restart +qall!\n')
-    screen_client:expect([[
+    local screen_restarted = [[
       ^                                                  |
       {100:~                                                 }|*3
       {3:[No Name]                                         }|
                                                         |
       {5:-- TERMINAL --}                                    |
-    ]])
-    screen_server:expect({ any = vim.pesc('[Process exited 0]') })
+    ]]
+    screen_client:expect(screen_restarted)
+    screen_server:expect(screen_restarted)
 
     feed_data(':echo "GUI Running: " .. has("gui_running")\013')
     screen_client:expect({ any = 'GUI Running: 0' })
 
-    feed_data(':q!\r')
+    -- The :vsplit command should only be executed once.
+    feed_data(':restart vsplit\r')
+    screen_restarted = [[
+      ^                         │                        |
+      {100:~                        }│{100:~                       }|*3
+      {3:[No Name]                 }{2:[No Name]               }|
+                                                        |
+      {5:-- TERMINAL --}                                    |
+    ]]
+    screen_client:expect(screen_restarted)
+    screen_server:expect(screen_restarted)
+
+    feed_data(':qall!\r')
     screen_client:expect({ any = vim.pesc('[Process exited 0]') })
+    screen_server:expect({ any = vim.pesc('[Process exited 0]') })
   end)
 
   local function start_headless_server_and_client(use_testlog)
